@@ -2,7 +2,8 @@ import processing.svg.*;
 
 void setup() {
   // width, height in pixels
-  size(790, 550, SVG, "flow_field.svg");
+  // slightly smaller than a5
+  size(750, 500, SVG, "flow_field.svg");
   smooth();
   strokeWeight(2);
   stroke(0,0,0);
@@ -29,16 +30,18 @@ void setup() {
     for (int row = 0; row < num_rows - 1; row +=1) {
       float scaled_x = column * 0.005;
       float scaled_y = row * 0.005;
+      noiseDetail(8,0.55);
       float noise_value = noise(scaled_x, scaled_y);
       angle = map(noise_value, 0.0, 1.0, 0.0, PI * 2.0);
       grid[column][row] = angle;
     }
   }
   
-  y = 1;
-  
-  for (x = -200; x < 800; x = x+10) { //<>//
-    drawCurve(x, y, left_x, top_y, resolution, grid);
+  for (y = 1; y < height; y = y+30) {
+    for (x = 0; x < width; x = x+30) { //<>//
+      float position_noise = noise(x, y) * 30;
+      drawCurve(x + position_noise, y + position_noise, left_x, top_y, resolution, grid);
+    }
   }
   
   //exit() required for SVG generation
@@ -49,7 +52,7 @@ void setup() {
 void drawCurve(float x, float y, int left_x, int top_y, float resolution, float[][] grid) {
   int num_steps, column_index, row_index;
   float step_length, grid_angle, x_step, y_step;
-  num_steps = 160;
+  num_steps = 60;
   step_length = 4;
   beginShape();
   for (int i = 0; i < num_steps; i = i+1) {
