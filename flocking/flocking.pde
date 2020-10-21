@@ -2,12 +2,12 @@ import processing.svg.*;
 
 Flock flock;
 String saveName = "flocking_";
-int _flock_size = 350;
+int _flock_size = 150;
 float _separationFactor = 1.5;
 float _alignmentFactor = 1.0;
-float _cohesionFactor = 1.0;
-float _neighbordist = 50;
-float _targetSeekingFactor = 0.5;
+float _cohesionFactor = 0.8;
+float _neighbordist = 60;
+float _targetSeekingFactor = 0.8;
 //PShape leaf = new PShape();
 
 void setup() {
@@ -17,7 +17,15 @@ void setup() {
 
   //Add initial flock members
   for (int i=0; i < _flock_size; i++) {
-    flock.addMember(new Member(width/2, height/2));
+    flock.addMember(new Member(width*0.8, height/5));
+  }
+  
+  for (int i=0; i < _flock_size; i++) {
+    flock.addMember(new Member(width/6, height/3));
+  }
+  
+  for (int i=0; i < _flock_size; i++) {
+    flock.addMember(new Member(width/2, height*0.8));
   }
 }
 
@@ -66,8 +74,8 @@ class Flock {
       pg.pushMatrix();
       float theta = m.velocity.heading() + radians(90);
       pg.translate(m.position.x, m.position.y);
-      pg.rotate(theta); // rotate being applied globally?
-      pg.ellipse(0, 0, m.r*4, m.r*8);
+      pg.rotate(theta);
+      pg.ellipse(0, 0, m.r*3, m.r*6);
       pg.popMatrix();
     }
     
