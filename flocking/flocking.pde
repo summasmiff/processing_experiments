@@ -5,15 +5,16 @@ String saveName = "flocking_";
 int _flock_size = 150;
 float _separationFactor = 1.5;
 float _alignmentFactor = 1.0;
-float _cohesionFactor = 0.8;
+float _cohesionFactor = 0.4;
 float _neighbordist = 60;
-float _targetSeekingFactor = 0.8;
-//PShape leaf = new PShape();
+float _gravityFactor = 0.8;
+float _targetFactor = 1.6;
+PShape leaf = new PShape();
 
 void setup() {
   size(750, 500);
   flock = new Flock();
-  //leaf = loadShape("leaf.svg");
+  leaf = loadShape("leaf.svg");
 
   //Add initial flock members
   for (int i=0; i < _flock_size; i++) {
@@ -75,7 +76,7 @@ class Flock {
       float theta = m.velocity.heading() + radians(90);
       pg.translate(m.position.x, m.position.y);
       pg.rotate(theta);
-      pg.ellipse(0, 0, m.r*3, m.r*6);
+      pg.shape(leaf, 0, 0, m.r*10, m.r*10);
       pg.popMatrix();
     }
     
@@ -118,17 +119,21 @@ class Member {
     PVector alignment = align(members);
     PVector cohesion = cohesion(members);
     PVector target = new PVector(mouseX, mouseY);
-    PVector seeking_target = seek(target);
+    PVector gravity = new PVector(position.x, 500);
+    PVector gravity_pull = seek(gravity);
+    PVector avoid_target = avoid(target);
 
     separation.mult(_separationFactor);
     alignment.mult(_alignmentFactor);
     cohesion.mult(_cohesionFactor);
-    seeking_target.mult(_targetSeekingFactor);
+    gravity_pull.mult(_gravityFactor);
+    avoid_target.mult(_targetFactor);
 
     applyForce(separation);
     applyForce(alignment);
     applyForce(cohesion);
-    applyForce(seeking_target);
+    applyForce(gravity_pull);
+    applyForce(avoid_target);
   }
 
   void update() {
@@ -145,6 +150,18 @@ class Member {
     desired.setMag(maxSpeed);
     PVector steer = PVector.sub(desired, velocity);
     steer.limit(maxForce);
+    return steer;
+  }
+  
+  PVector avoid(PVector target) {
+    float d = PVector.dist(position, target);
+    PVector steer = new PVector(0, 0);
+    if(d < 100) {
+      PVector desired = PVector.sub(position, target); // create a vector pointing away from target
+      desired.setMag(maxSpeed);
+      steer = PVector.sub(desired, velocity);
+      steer.limit(maxForce);
+    } 
     return steer;
   }
 
@@ -229,11 +246,12 @@ class Member {
   void render() {
     float theta = velocity.heading() + radians(90);
     stroke(0);
+    strokeWeight(1);
     noFill();
     pushMatrix();
     translate(position.x, position.y);
     rotate(theta);
-    //shape(leaf, 0, 0, r, r);
+    //shape(leaf, 0, 0, r*10, r*10);
     beginShape(TRIANGLES);
     vertex(0, -r*2);
     vertex(-r, r*2);
