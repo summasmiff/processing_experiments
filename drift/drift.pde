@@ -15,13 +15,13 @@ void setup() {
   stroke(0,0,0);
   noFill();
   
-  beginRaw(SVG, "drift.svg");
+  beginRaw(SVG, "drift_9.svg");
   
   // Move origin to rotate "camera"
-  translate(width/2, height/2);
+  translate(width/2, height/3 * 2);
   rotateX(PI/5);
   // Move origin for placement of mesh
-  translate(-w/2, -h/1.5);
+  translate(-w/2, -h/2, -h);
   
   for (int y = 0; y < rows; y++) {
     beginShape(TRIANGLE_STRIP);
@@ -29,9 +29,13 @@ void setup() {
       float scaled_x = x * small;
       float scaled_y = y * small;
       float scaled_yplus = (y + 1) * small;
+      float z = x*1.2 + y*1.2;
       //noiseDetail(2,0.5);
-      vertex(x*scale, y*scale, noise(scaled_x,scaled_y)*z_scale);
-      vertex(x*scale, (y+1)*scale, noise(scaled_x, scaled_yplus)*z_scale);
+      //noiseDetail(5, 0.4);
+      //noiseDetail(8, 0.5);
+      noiseDetail(6,0.6);
+      vertex(x*scale, y*scale, noise(scaled_x,scaled_y)*z_scale + z);
+      vertex(x*scale, (y+1)*scale, noise(scaled_x, scaled_yplus)*z_scale + z);
     }
     endShape();
   }
