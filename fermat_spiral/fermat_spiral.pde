@@ -3,7 +3,8 @@ import processing.svg.*;
 int _numPoints = 450;
 float _angle = 137.5;
 float _scale = 10;
-float _seedSize = 20;
+float _seedSize = random(8, 15);
+float _growScale = random(15, 30);
 String _saveName = "fermat_spiral_";
 
 
@@ -25,7 +26,7 @@ void draw() {
     float x = 0;
     float y = 0;
 
-    float size = (n / 42) + _seedSize;
+    float size = (n / _growScale) + _seedSize;
 
     pushMatrix();      
     translate(translateX, translateY);
@@ -42,7 +43,7 @@ void keyPressed() {
 }
 
 void exportSVG() {
-  String exportName = _saveName + round(_seedSize) + ".svg";
+  String exportName = _saveName + round(_seedSize) + "_"+ round(_growScale) + ".svg";
   PGraphics pg = createGraphics(width, height, SVG, exportName);
   pg.beginDraw();
   pg.noFill();
@@ -58,7 +59,7 @@ void exportSVG() {
     float x = 0;
     float y = 0;
 
-    float size = (n / 42) + _seedSize;
+    float size = (n / _growScale) + _seedSize;
 
     pg.pushMatrix();      
     pg.translate(translateX, translateY);
