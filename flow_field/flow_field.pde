@@ -10,11 +10,12 @@ int column_index, row_index;
 float grid_angle, x_step, y_step;
 float position_noise;
 
-int _octave = round(random(8, 24));
-float step_length = random(1, 4);
+float step_length = 1;
+
+int _octave = round(random(4, 6));
+float falloff = random(0.75, 0.8);
 int num_steps = round(random(100, 200));
-float falloff = random(0.5, 0.9);
-int num_lines = 100;
+int num_lines = round(random(400, 800));
 
 void setup() {
   // width, height in pixels
@@ -25,14 +26,16 @@ void setup() {
   stroke(0, 0, 0);
   noFill();
 
-  println(num_steps);
-  println(falloff);
+  println("octave: " + _octave);
+  println("falloff: " + falloff);
+  println("num_steps: " + num_steps);
+  println("num_lines: " + num_lines);
 
   // make grid larger than paper so lines can flow off
-  left_x = int(width * -2);
-  right_x = int(width * 2);
-  top_y = int(height * -2);
-  bottom_y = int(height * 2);
+  left_x = int(width * -4);
+  right_x = int(width * 4);
+  top_y = int(height * -4);
+  bottom_y = int(height * 4);
   resolution = int(width * 0.01);
   num_columns = (right_x - left_x) / resolution;
   num_rows = (bottom_y - top_y) / resolution;
@@ -80,7 +83,7 @@ void keyPressed() {
       num_steps = num_steps + 10;
     } else if (keyCode == DOWN) {
       num_steps = num_steps -10;
-    }
+    } 
   }
 }
 
