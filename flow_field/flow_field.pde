@@ -10,12 +10,12 @@ int column_index, row_index;
 float grid_angle, x_step, y_step;
 float position_noise;
 
-float step_length = 1;
+float step_length = 10;
 
 int _octave = round(random(4, 6));
 float falloff = random(0.75, 0.8);
-int num_steps = round(random(100, 200));
-int num_lines = round(random(400, 800));
+int num_steps = round(random(100, 150));
+int num_lines = round(random(50, 70));
 
 void setup() {
   // width, height in pixels
@@ -55,7 +55,7 @@ void setup() {
   }
 
   for (int j = 1; j < num_lines; j = j+1) {
-    float x = random(0, width);
+    float x = random(width/11, (width/7)*6);
     float y = random(0, height);
     float[] point = new float[2];
     point[0] = x;
@@ -87,6 +87,28 @@ void keyPressed() {
   }
 }
 
+
+void drawCurves(float x, float y, int left_x, int top_y, float resolution, float[][] grid) {
+  beginShape();
+  for (int i = 0; i < num_steps; i = i+1) {
+    vertex(x, y);
+    int x_offset = int(x) - left_x;
+    int y_offset = int(y) - top_y;
+
+    column_index = int(x_offset / resolution);
+    row_index = int(y_offset / resolution);
+
+    grid_angle = grid[column_index][row_index];
+
+    x_step = step_length * cos(grid_angle); 
+    y_step = step_length * sin(grid_angle);
+
+    x = x + x_step;
+    y = y + y_step;
+  }
+  endShape();
+};
+
 void exportSVG() {
   int name_falloff = round(falloff * 10);
   String exportName = _saveName + num_steps + "_" + name_falloff + ".svg";
@@ -107,7 +129,8 @@ void exportSVG() {
     
     // drawCurves
     for (int i = 0; i < num_steps; i = i+1) {
-      pg.vertex(x, y);
+      int c_size = round(random(4, 9) * (y / 150));
+      pg.ellipse(x, y, c_size, c_size);
 
       int x_offset = int(x) - left_x;
       int y_offset = int(y) - top_y;
@@ -131,24 +154,3 @@ void exportSVG() {
   pg.dispose();
   println("saved " + exportName);
 }
-
-void drawCurves(float x, float y, int left_x, int top_y, float resolution, float[][] grid) {
-  beginShape();
-  for (int i = 0; i < num_steps; i = i+1) {
-    vertex(x, y);
-    int x_offset = int(x) - left_x;
-    int y_offset = int(y) - top_y;
-
-    column_index = int(x_offset / resolution);
-    row_index = int(y_offset / resolution);
-
-    grid_angle = grid[column_index][row_index];
-
-    x_step = step_length * cos(grid_angle); 
-    y_step = step_length * sin(grid_angle);
-
-    x = x + x_step;
-    y = y + y_step;
-  }
-  endShape();
-};
