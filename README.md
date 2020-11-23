@@ -1,5 +1,9 @@
 # processing experiments
 
+<img src="./output/neon_flow_field.jpg" alt="flow field drawn in fluorescent ink on black paper" />
+<i>"flow field" november 2020</i>
+<hr />
+
 SVG generation for the axidraw pen plotter (https://axidraw.com/)
 written in processing (https://processing.org/)
 
