@@ -3,16 +3,18 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 
 PShape fernSVG;
-boolean shouldRecord = false; // Used to control svg render
+PShape[] bentFronds; // frond cache
+boolean shouldRecord = false;
 
-// Frond Deformation -
-float radius = 350;
-float svgWidth = 409;  // needed for correct aspect ratio
-float svgHeight = 785; // can this be derived from loading the shape?
+// bent frond
+float frondBendRadius = random(300, 900);
+float angleDeg = random(50, 75);
+float svgWidth; // needed for correct aspect ratio
+float svgHeight;
 
-// 3D Fern Render
-int frondNum = 8;     // Number of SVGs arranged in the circle
-float circleRadius = 200;  // How far from the center the SVGs are placed
+// 3D Fern render
+int frondNum = 11;
+float maxFernDistance = 700;
 
 String generateFilename() {
   String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
@@ -21,78 +23,98 @@ String generateFilename() {
 
 void setup() {
   size(800, 800, P3D);
-  fernSVG = loadShape("fern.svg"); // lives in "./data"
+  hint(ENABLE_DEPTH_SORT); // helper for rendering 3d to svg
+  println("Frond Radius: ", frondBendRadius);
+
+  fernSVG = loadShape("cinnamon-fern.svg"); // lives in "./data"
+  if (fernSVG == null) {
+    println("WHOA no svg found :(");
+    exit();
+    return;
+  }
+
+  svgWidth = fernSVG.width;
+  svgHeight = fernSVG.height;
+
+  bentFronds = new PShape[frondNum];
+
+  // bent fern cache
+  for (int i = 0; i < frondNum; i++) {
+    bentFronds[i] = createShape(GROUP);
+    buildBentFrondCache(fernSVG, bentFronds[i]);
+  }
 }
 
 void draw() {
   if (shouldRecord) {
     beginRaw(SVG, generateFilename());
   }
-
   background(255);
 
-  // Position camera
-  translate(width / 2, height / 2, -1200);
+  // camera position with mouse control
+  translate(width / 2, height, -1000);
+  rotateX(map(mouseY, 0, height, -TWO_PI, TWO_PI));
+  rotateY(map(mouseX, 0, width, -TWO_PI, TWO_PI));
 
-  // camera controlled by mouse
-  rotateX(map(mouseY, 0, height, -PI, PI));
-  rotateY(map(mouseX, 0, width, -PI, PI));
-
-  // axidraw style
+  // axidraw styles
   noFill();
   stroke(0);
   strokeWeight(1);
 
+  // render loop using cache
+  randomSeed(1234);
   for (int i = 0; i < frondNum; i++) {
     pushMatrix();
+
     float ringAngle = map(i, 0, frondNum, 0, TWO_PI);
-
-    // rotate and move the local grid
     rotateY(ringAngle);
-    translate(0, 0, circleRadius);
+    translate(0, 0, random(maxFernDistance));
 
-    // render the frond at this position
-    deformAndDrawShape(fernSVG);
+    shape(bentFronds[i]);
 
-    popMatrix(); // restore local grid transforms
+    popMatrix();
   }
 
   if (shouldRecord) {
     endRaw();
     shouldRecord = false;
-    println("Vector SVG exported successfully!");
+    println("yay SVG exported!");
   }
 }
 
-void deformAndDrawShape(PShape shp) {
-  int childCount = shp.getChildCount(); // get svg groups
+void buildBentFrondCache(PShape source, PShape targetGroup) {
+  int childCount = source.getChildCount();
 
   if (childCount > 0) {
     for (int i = 0; i < childCount; i++) {
-      deformAndDrawShape(shp.getChild(i));
+      buildBentFrondCache(source.getChild(i), targetGroup);
     }
   } else {
-    int vertexCount = shp.getVertexCount();
+    int vertexCount = source.getVertexCount();
     if (vertexCount > 0) {
-      beginShape();
+      // use pen plotting styles
+      PShape pathSection = createShape();
+      pathSection.beginShape();
+      pathSection.noFill();
+      pathSection.stroke(0);
+      pathSection.strokeWeight(1);
+
       for (int j = 0; j < vertexCount; j++) {
-        PVector v = shp.getVertex(j);
+        PVector v = source.getVertex(j);
 
-        // main deform: arc along y axis
-        float flippedY = svgHeight - v.y; // flip Y so bottom is at origin (0)
-        float normalizedY = flippedY / svgHeight; // y as percentage from bottom
-        float angle = normalizedY * PI;
-
-        // this too i guess
+        float flippedY = svgHeight - v.y; // flip upside down so ferns grow up
+        float normalizedY = flippedY / svgHeight; // y as percentage of height
+        float angle = normalizedY * radians(angleDeg);
         float centeredX = v.x - (svgWidth / 2);
-        float xFlare = 0.80; // increase to push tips further outward
+        float xFlare = 0.10;
 
         float bentX = centeredX * (1 + xFlare * normalizedY);
-        float bentY = radius * sin(angle);
-        float bentZ = radius - radius * cos(angle); // flip the Z so the frond curves out
-        vertex(bentX, bentY, bentZ);
+        float bentY = frondBendRadius * sin(angle);
+        float bentZ = frondBendRadius - frondBendRadius * cos(angle); // bend outwards
+        pathSection.vertex(bentX, bentY, bentZ);
       }
-      endShape();
+      pathSection.endShape();
+      targetGroup.addChild(pathSection);
     }
   }
 }
