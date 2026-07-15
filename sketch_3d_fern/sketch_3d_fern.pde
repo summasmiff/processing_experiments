@@ -2,19 +2,24 @@ import processing.svg.*;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 
+String fernFilename = "fern-6";
+
 PShape fernSVG;
 PShape[] bentFronds; // frond cache
 boolean shouldRecord = false;
 
 // bent frond
-float frondBendRadius = random(300, 900);
+float frondBendRadius = 700; // Needs to be larger than the svgHeight
 float angleDeg = random(50, 75);
 float svgWidth; // needed for correct aspect ratio
 float svgHeight;
+// how much of the spiral to use
+float spiralAngleDeg = random(20, 150); // good values: 82 92
+float PHI = 1.61803398875f;
 
 // 3D Fern render
 int frondNum = 11;
-float maxFernDistance = 700;
+float maxFernDistance = 500;
 
 String generateFilename() {
   String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
@@ -24,21 +29,20 @@ String generateFilename() {
 void setup() {
   size(800, 800, P3D);
   hint(ENABLE_DEPTH_SORT); // helper for rendering 3d to svg
-  println("Frond Radius: ", frondBendRadius);
+  println("frondBendRadius: ", frondBendRadius);
+  println("spiralAngleDeg: ", spiralAngleDeg);
 
-  fernSVG = loadShape("cinnamon-fern.svg"); // lives in "./data"
+  fernSVG = loadShape(fernFilename + ".svg"); // lives in "./data"
   if (fernSVG == null) {
     println("WHOA no svg found :(");
     exit();
     return;
   }
-
   svgWidth = fernSVG.width;
   svgHeight = fernSVG.height;
 
-  bentFronds = new PShape[frondNum];
-
   // bent fern cache
+  bentFronds = new PShape[frondNum];
   for (int i = 0; i < frondNum; i++) {
     bentFronds[i] = createShape(GROUP);
     buildBentFrondCache(fernSVG, bentFronds[i]);
@@ -50,11 +54,11 @@ void draw() {
     beginRaw(SVG, generateFilename());
   }
   background(255);
-
   // camera position with mouse control
-  translate(width / 2, height, -1000);
+  translate(width / 2, (height - (height/3)), 0);
   rotateX(map(mouseY, 0, height, -TWO_PI, TWO_PI));
   rotateY(map(mouseX, 0, width, -TWO_PI, TWO_PI));
+  scale(0.4); // make fern smaller to fit on screen
 
   // axidraw styles
   noFill();
@@ -68,8 +72,8 @@ void draw() {
 
     float ringAngle = map(i, 0, frondNum, 0, TWO_PI);
     rotateY(ringAngle);
+    // rotateZ(HALF_PI);
     translate(0, 0, random(maxFernDistance));
-
     shape(bentFronds[i]);
 
     popMatrix();
@@ -104,14 +108,21 @@ void buildBentFrondCache(PShape source, PShape targetGroup) {
 
         float flippedY = svgHeight - v.y; // flip upside down so ferns grow up
         float normalizedY = flippedY / svgHeight; // y as percentage of height
-        float angle = normalizedY * radians(angleDeg);
+
+        float theta = normalizedY * radians(spiralAngleDeg);
         float centeredX = v.x - (svgWidth / 2);
         float xFlare = 0.10;
 
+        // Golden spiral radius.
+        // Radius changes by PHI every quarter turn.
+        // Negative exponent = inward curl toward the frond tip.
+        float r = frondBendRadius * pow(PHI, -theta / HALF_PI);
         float bentX = centeredX * (1 + xFlare * normalizedY);
-        float bentY = frondBendRadius * sin(angle);
-        float bentZ = frondBendRadius - frondBendRadius * cos(angle); // bend outwards
+        float bentY = r * sin(theta);
+        float bentZ = frondBendRadius - r * cos(theta);
+
         pathSection.vertex(bentX, bentY, bentZ);
+
       }
       pathSection.endShape();
       targetGroup.addChild(pathSection);
