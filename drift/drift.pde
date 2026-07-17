@@ -3,13 +3,15 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 
 int cols,rows;
-int scale = 10;
+int scale = 7;
 float z_scale = random(90); // height displacement
 int w = 900;
 int h = 700;
-float small = 0.4;
+float noiseScale = 0.12;
 boolean shouldRecord = false;
 PShape grid;
+int octave;
+float noiseFalloff = 0.5;
 
 String generateFilename() {
   String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
@@ -18,48 +20,79 @@ String generateFilename() {
 
 public void settings() {
   size(w, h, P3D);
+  pixelDensity(1);
 }
 
 void setup() {
   hint(ENABLE_DEPTH_SORT); // helper for rendering 3d to svg
-  println("z_scale: ", z_scale);
   cols = w / scale;
   rows = h / scale;
 
+  octave = round(random(1, 5));
+  noiseDetail(octave, noiseFalloff);
+
+  buildGrid();
+}
+
+void buildGrid() {
   grid = createShape(GROUP);
-  int octave = round(random(1, 4));
-  noiseDetail(octave, 0.5);
+
+  // Define how much of the canvas height should be disintegrating
+  float skipPercentage = 80.0;
+
+  // Y coordinate where disintegration should start
+  // eg If skipPercentage is 80, it starts 20% from the top.
+  float startSkipY = map(100.0 - skipPercentage, 0.0, 100.0, -h/2.0, h/2.0);
 
   for (int y = 0; y < rows; y++) {
-    PShape row = createShape();
-    row.beginShape(QUAD_STRIP);
-    row.stroke(0);
-    row.strokeWeight(1);
-    row.noFill();
-    for (int x = 0; x < cols; x++) {
-      // Scale grid coordinates to noise space
-      float scaled_x = x * small;
-      float scaled_y = y * small;
-      float scaled_yplus = (y + 1) * small;
-      // Add linear ramp to create diagonal wave pattern
-      float z = x*1.2 + y*1.2;
+    PShape currentStrip = null;
 
-      // Convert grid coordinates to screen space, centered at origin
+    for (int x = 0; x < cols; x++) {
       float xPos = x * scale - w/2;
       float yPos = y * scale - h/2;
       float yNextPos = (y + 1) * scale - h/2;
+      float baseZ = (x + y) * 0.2;
+      float n0 = noise(x * noiseScale, y * noiseScale);
+      float n1 = noise(x * noiseScale, (y + 1) * noiseScale);
+      float wave = sin((x + y) * 0.12 + n0 * TWO_PI) * z_scale * 0.6;
+      float z1 = n0 * z_scale + baseZ + wave;
+      float z2 = n1 * z_scale + baseZ + wave;
 
-      // Sample Perlin noise at current and next row, scaled by height factor
-      float z1 = noise(scaled_x, scaled_y) * z_scale + z;
-      float z2 = noise(scaled_x, scaled_yplus) * z_scale + z;
+      boolean shouldDraw = true;
 
-      row.vertex(xPos, yPos, z1);
-      row.vertex(xPos, yNextPos, z2);
+      if (yPos > startSkipY) {
+        float skipProbability = constrain(map(yPos, startSkipY, h/2.0, 0.0, 1.0), 0.0, 1.0);
+
+        if (random(1) < skipProbability) {
+          shouldDraw = false;
+        }
+      }
+
+      if (shouldDraw) {
+        if (currentStrip == null) {
+          currentStrip = createShape();
+          currentStrip.beginShape(QUAD_STRIP);
+          currentStrip.stroke(0);
+          currentStrip.strokeWeight(1);
+          currentStrip.noFill();
+        }
+        currentStrip.vertex(xPos, yPos, z1);
+        currentStrip.vertex(xPos, yNextPos, z2);
+
+      } else {
+        if (currentStrip != null) {
+          currentStrip.endShape();
+          grid.addChild(currentStrip);
+          currentStrip = null;
+        }
+      }
     }
-    row.endShape();
-    grid.addChild(row);
-  }
 
+    if (currentStrip != null) {
+      currentStrip.endShape();
+      grid.addChild(currentStrip);
+    }
+  }
 }
 
 void draw() {
@@ -86,5 +119,23 @@ void draw() {
 void keyPressed() {
   if (key == 'r' || key == 'R') {
     shouldRecord = true;
+  } else if (key == '+' || key == '=') {
+    octave = min(12, octave + 1);
+    noiseDetail(octave, noiseFalloff);
+    println("octave:", octave);
+    buildGrid();
+  } else if (key == '-') {
+    octave = max(1, octave - 1);
+    noiseDetail(octave, noiseFalloff);
+    println("octave:", octave);
+    buildGrid();
+  } else if (key == '[') {
+    z_scale = max(10, z_scale - 10);
+    println("z_scale:", z_scale);
+    buildGrid();
+  } else if (key == ']') {
+    z_scale = min(90, z_scale + 10);
+    println("z_scale:", z_scale);
+    buildGrid();
   }
 }
