@@ -3,15 +3,39 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 
+// --- base config ---
 int w = 700;
 int h = 900;
-float curveSmoothness = 0.4;
-
-// Globals for keyPressed editing
 int webSpacing = 15;
-float droopFactor = 0.25;
 int numSpokes = 20;
+
+// --- keyPressed state ---
+float droopFactor = 0.25;
 boolean shouldRecord = false;
+
+// --- constants ---
+final float CURVE_SMOOTHNESS = 0.4;
+final float HUB_RADIUS = 20;
+final float DROOP_ADJUSTMENT_STEP = 0.05;
+final float MAX_SPOKE_JITTER = 2.0; // degrees
+final int MAX_SPIRAL_CONNECTIONS = 2;
+
+class Spoke {
+  float angle;
+  PVector start; // Hub vertex
+  PVector end;   // Perimeter intersection
+  float length;
+
+  Spoke(PVector hub, float angle) {
+    this.angle = angle;
+    this.start = new PVector(
+      hub.x + cos(angle) * HUB_RADIUS,
+      hub.y + sin(angle) * HUB_RADIUS
+    );
+    this.end = getPerimeterIntersection(hub, angle);
+    this.length = PVector.dist(this.start, this.end);
+  }
+}
 
 String generateFilename() {
   String timestamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
@@ -28,13 +52,8 @@ void setup() {
 }
 
 void draw() {
-  if (!shouldRecord) {
-    background(255);
-  }
-
-  if (shouldRecord) {
-    beginRecord(SVG, generateFilename());
-  }
+  if (!shouldRecord) background(255);
+  if (shouldRecord) beginRecord(SVG, generateFilename());
 
   stroke(0);
   strokeWeight(1);
@@ -49,139 +68,127 @@ void draw() {
   }
 }
 
-// SVG export-friendly cubic bezier with two distinct control points for gradual droop
-void drawBezierCurve(float x1, float y1, float midDroopX, float midDroopY, float x2, float y2) {
-  // Control point 1: between start and midpoint, biased toward start
-  float cx1 = lerp(x1, midDroopX, curveSmoothness);
-  float cy1 = lerp(y1, midDroopY, curveSmoothness);
-
-  // Control point 2: between end and midpoint, biased toward end
-  float cx2 = lerp(x2, midDroopX, curveSmoothness);
-  float cy2 = lerp(y2, midDroopY, curveSmoothness);
-
-  beginShape();
-  vertex(x1, y1);
-  bezierVertex(cx1, cy1, cx2, cy2, x2, y2);
-  endShape();
+void keyPressed() {
+  if (key == 'r' || key == 'R') {
+    shouldRecord = true;
+    redraw();
+  } else if (keyCode == DOWN) {
+    droopFactor += DROOP_ADJUSTMENT_STEP;
+    println("droopFactor: " + droopFactor);
+    redraw();
+  } else if (keyCode == UP) {
+    droopFactor = max(0, droopFactor - DROOP_ADJUSTMENT_STEP);
+    println("droopFactor: " + droopFactor);
+    redraw();
+  }
 }
 
 void spinWeb() {
   PVector hub = new PVector(w / 2.0, h / 2.0);
-  float hubRadius = 20;
-  float minRadius = hubRadius + webSpacing;
+  Spoke[] spokes = generateSpokes(hub);
 
+  drawSpokes(spokes);
+  drawHub(spokes);
+  drawSpiral(spokes);
+}
+
+Spoke[] generateSpokes(PVector hub) {
+  Spoke[] spokes = new Spoke[numSpokes];
   float baseAngle = TWO_PI / numSpokes;
-  float[] angles = new float[numSpokes];
-  float[] radii = new float[numSpokes];
-  PVector[] spokeEnds = new PVector[numSpokes];
 
-  // Draw spokes
   for (int i = 0; i < numSpokes; i++) {
-    float angle = i * baseAngle + radians(random(-2, 2));
-    angles[i] = angle;
-
-    PVector perimeterPoint = getPerimeterIntersection(hub, angle);
-    spokeEnds[i] = perimeterPoint;
-    radii[i] = dist(hub.x, hub.y, perimeterPoint.x, perimeterPoint.y);
-
-    float hubVertexX = hub.x + cos(angle) * hubRadius;
-    float hubVertexY = hub.y + sin(angle) * hubRadius;
-
-    float segDx = perimeterPoint.x - hubVertexX;
-    float segDy = perimeterPoint.y - hubVertexY;
-    float segAngle = atan2(segDy, segDx);
-    float horizontalness = abs(cos(segAngle));
-    float segLength = dist(hubVertexX, hubVertexY, perimeterPoint.x, perimeterPoint.y);
-
-    float midX = (hubVertexX + perimeterPoint.x) / 2.0;
-    float midY = (hubVertexY + perimeterPoint.y) / 2.0;
-
-    float droopAmount = segLength * horizontalness * droopFactor;
-    float cx = midX;
-    float cy = midY + droopAmount;
-    drawBezierCurve(hubVertexX, hubVertexY, cx, cy, perimeterPoint.x, perimeterPoint.y);
+    float jitteredAngle = i * baseAngle + radians(random(-MAX_SPOKE_JITTER, MAX_SPOKE_JITTER));
+    spokes[i] = new Spoke(hub, jitteredAngle);
   }
+  return spokes;
+}
 
-  // Draw the hub polygon
+void drawSpokes(Spoke[] spokes) {
+  for (Spoke spoke : spokes) {
+    drawDroopedCurve(spoke.start, spoke.end, droopFactor);
+  }
+}
+
+void drawHub(Spoke[] spokes) {
   beginShape();
-  for (int i = 0; i < numSpokes; i++) {
-    float hubVertexX = hub.x + cos(angles[i]) * hubRadius;
-    float hubVertexY = hub.y + sin(angles[i]) * hubRadius;
-    vertex(hubVertexX, hubVertexY);
+  for (Spoke spoke : spokes) {
+    vertex(spoke.start.x, spoke.start.y);
   }
   endShape(CLOSE);
+}
 
-  float spiralStep = webSpacing;
-  float maxRadius = 0;
-  for (float r : radii) {
-    if (r > maxRadius) maxRadius = r;
-  }
-  // Collect connection points to ensure only 2 spiral segments connects to each spoke
-  HashMap<String, Integer> connections = new HashMap<String, Integer>();
+void drawSpiral(Spoke[] spokes) {
+  float maxSpiralRadius = getMaxSpokeLength(spokes);
+  float minSpiralRadius = webSpacing; // Distance from hub vertex
 
-  // Draw spiral segments
-  for (float currentRadius = maxRadius; currentRadius > minRadius; currentRadius -= spiralStep) {
-    for (int i = 0; i < numSpokes; i++) {
-      int next = (i + 1) % numSpokes;
+  HashMap<String, Integer> connections = new HashMap<>();
 
-      if (radii[i] >= currentRadius) {
-        PVector p1 = getDroopedSpokePoint(hub, angles[i], hubRadius, currentRadius, radii[i], droopFactor);
-        float r2 = min(radii[next], currentRadius);
-        PVector p2 = getDroopedSpokePoint(hub, angles[next], hubRadius, r2, radii[next], droopFactor);
+  // Draw spiral from the outside in
+  for (float currentRadius = maxSpiralRadius; currentRadius > minSpiralRadius; currentRadius -= webSpacing) {
+    for (int i = 0; i < spokes.length; i++) {
+      Spoke current = spokes[i];
+      Spoke next = spokes[(i + 1) % spokes.length];
+
+      if (current.length >= currentRadius) {
+        PVector p1 = getPointOnDroopedSpoke(current, currentRadius);
+        float nextRadius = min(next.length, currentRadius);
+        PVector p2 = getPointOnDroopedSpoke(next, nextRadius);
 
         String key1 = i + "_" + round(currentRadius);
-        String key2 = next + "_" + round(r2);
+        String key2 = ((i + 1) % spokes.length) + "_" + round(nextRadius);
 
-        int count1 = connections.getOrDefault(key1, 0);
-        int count2 = connections.getOrDefault(key2, 0);
+        if (connections.getOrDefault(key1, 0) < MAX_SPIRAL_CONNECTIONS &&
+            connections.getOrDefault(key2, 0) < MAX_SPIRAL_CONNECTIONS) {
 
-        if (count1 < 2 && count2 < 2) {
-          float segDx = p2.x - p1.x;
-          float segDy = p2.y - p1.y;
-          float segAngle = atan2(segDy, segDx);
-          float horizontalness = abs(cos(segAngle));
-          float segLength = dist(p1.x, p1.y, p2.x, p2.y);
+          drawDroopedCurve(p1, p2, droopFactor);
 
-          float midX = (p1.x + p2.x) / 2.0;
-          float midY = (p1.y + p2.y) / 2.0;
-          float droopAmount = segLength * horizontalness * droopFactor;
-
-          float cx = midX;
-          float cy = midY + droopAmount;
-          drawBezierCurve(p1.x, p1.y, cx, cy, p2.x, p2.y);
-
-          connections.put(key1, count1 + 1);
-          connections.put(key2, count2 + 1);
+          connections.put(key1, connections.getOrDefault(key1, 0) + 1);
+          connections.put(key2, connections.getOrDefault(key2, 0) + 1);
         }
       }
     }
   }
 }
 
-PVector getDroopedSpokePoint(PVector hub, float angle, float hubRadius, float targetRadius, float spokeLength, float droopFactor) {
-  float hubVertexX = hub.x + cos(angle) * hubRadius;
-  float hubVertexY = hub.y + sin(angle) * hubRadius;
-  float perimeterX = hub.x + cos(angle) * spokeLength;
-  float perimeterY = hub.y + sin(angle) * spokeLength;
+// --- geometry helpers ---
+void drawDroopedCurve(PVector p1, PVector p2, float factor) {
+  PVector midDroop = calculateDroopControlPoint(p1, p2, factor);
 
-  float segLength = spokeLength - hubRadius;
-  float horizontalness = abs(cos(angle));
-  float droopAmount = segLength * horizontalness * droopFactor;
+  float cx1 = lerp(p1.x, midDroop.x, CURVE_SMOOTHNESS);
+  float cy1 = lerp(p1.y, midDroop.y, CURVE_SMOOTHNESS);
+  float cx2 = lerp(p2.x, midDroop.x, CURVE_SMOOTHNESS);
+  float cy2 = lerp(p2.y, midDroop.y, CURVE_SMOOTHNESS);
 
-  float midDroopX = (hubVertexX + perimeterX) / 2.0;
-  float midDroopY = (hubVertexY + perimeterY) / 2.0 + droopAmount;
+  beginShape();
+  vertex(p1.x, p1.y);
+  bezierVertex(cx1, cy1, cx2, cy2, p2.x, p2.y);
+  endShape();
+}
 
-  // Calculate two control points matching the drawBezierCurve function
-  float cx1 = lerp(hubVertexX, midDroopX, curveSmoothness);
-  float cy1 = lerp(hubVertexY, midDroopY, curveSmoothness);
-  float cx2 = lerp(perimeterX, midDroopX, curveSmoothness);
-  float cy2 = lerp(perimeterY, midDroopY, curveSmoothness);
+PVector calculateDroopControlPoint(PVector p1, PVector p2, float factor) {
+  float segLength = PVector.dist(p1, p2);
+  float segAngle = atan2(p2.y - p1.y, p2.x - p1.x);
+  float horizontalness = abs(cos(segAngle));
+  float droopAmount = segLength * horizontalness * factor;
 
-  float t = (targetRadius - hubRadius) / segLength;
-  t = constrain(t, 0, 1);
+  return new PVector(
+    (p1.x + p2.x) / 2.0,
+    (p1.y + p2.y) / 2.0 + droopAmount
+  );
+}
 
-  float x = bezierPoint(hubVertexX, cx1, cx2, perimeterX, t);
-  float y = bezierPoint(hubVertexY, cy1, cy2, perimeterY, t);
+PVector getPointOnDroopedSpoke(Spoke spoke, float distFromStart) {
+  PVector midDroop = calculateDroopControlPoint(spoke.start, spoke.end, droopFactor);
+
+  float cx1 = lerp(spoke.start.x, midDroop.x, CURVE_SMOOTHNESS);
+  float cy1 = lerp(spoke.start.y, midDroop.y, CURVE_SMOOTHNESS);
+  float cx2 = lerp(spoke.end.x, midDroop.x, CURVE_SMOOTHNESS);
+  float cy2 = lerp(spoke.end.y, midDroop.y, CURVE_SMOOTHNESS);
+
+  float t = constrain(distFromStart / spoke.length, 0, 1);
+
+  float x = bezierPoint(spoke.start.x, cx1, cx2, spoke.end.x, t);
+  float y = bezierPoint(spoke.start.y, cy1, cy2, spoke.end.y, t);
 
   return new PVector(x, y);
 }
@@ -189,33 +196,21 @@ PVector getDroopedSpokePoint(PVector hub, float angle, float hubRadius, float ta
 PVector getPerimeterIntersection(PVector origin, float angle) {
   float dx = cos(angle);
   float dy = sin(angle);
-  float cx = origin.x;
-  float cy = origin.y;
   float tMin = Float.MAX_VALUE;
 
-  if (dx > 0) tMin = min(tMin, (w - cx) / dx);
-  else if (dx < 0) tMin = min(tMin, -cx / dx);
-  if (dy > 0) tMin = min(tMin, (h - cy) / dy);
-  else if (dy < 0) tMin = min(tMin, -cy / dy);
+  if (dx > 0) tMin = min(tMin, (w - origin.x) / dx);
+  else if (dx < 0) tMin = min(tMin, -origin.x / dx);
 
-  return new PVector(cx + dx * tMin, cy + dy * tMin);
+  if (dy > 0) tMin = min(tMin, (h - origin.y) / dy);
+  else if (dy < 0) tMin = min(tMin, -origin.y / dy);
+
+  return new PVector(origin.x + dx * tMin, origin.y + dy * tMin);
 }
 
-void keyPressed() {
-  if (key == 'r' || key == 'R') {
-    shouldRecord = true;
-    redraw();
+float getMaxSpokeLength(Spoke[] spokes) {
+  float maxLen = 0;
+  for (Spoke s : spokes) {
+    if (s.length > maxLen) maxLen = s.length;
   }
-
-  if (keyCode == DOWN) {
-    droopFactor += 0.05;
-    println("droopFactor: " + droopFactor);
-    redraw();
-  }
-
-  if (keyCode == UP) {
-    droopFactor = max(0, droopFactor - 0.05);
-    println("droopFactor: " + droopFactor);
-    redraw();
-  }
+  return maxLen;
 }
