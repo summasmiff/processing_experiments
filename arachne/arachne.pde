@@ -3,8 +3,9 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 
-int w = 900;
-int h = 700;
+int w = 700;
+int h = 900;
+float curveSmoothness = 0.4;
 
 // Globals for keyPressed editing
 int webSpacing = 15;
@@ -27,11 +28,13 @@ void setup() {
 }
 
 void draw() {
+  if (!shouldRecord) {
+    background(255);
+  }
+
   if (shouldRecord) {
     beginRecord(SVG, generateFilename());
   }
-
-  background(255);
 
   stroke(0);
   strokeWeight(1);
@@ -46,11 +49,19 @@ void draw() {
   }
 }
 
-// SVG export friendly bezier
-void drawBezierCurve(float x1, float y1, float cx, float cy, float x2, float y2) {
+// SVG export-friendly cubic bezier with two distinct control points for gradual droop
+void drawBezierCurve(float x1, float y1, float midDroopX, float midDroopY, float x2, float y2) {
+  // Control point 1: between start and midpoint, biased toward start
+  float cx1 = lerp(x1, midDroopX, curveSmoothness);
+  float cy1 = lerp(y1, midDroopY, curveSmoothness);
+
+  // Control point 2: between end and midpoint, biased toward end
+  float cx2 = lerp(x2, midDroopX, curveSmoothness);
+  float cy2 = lerp(y2, midDroopY, curveSmoothness);
+
   beginShape();
   vertex(x1, y1);
-  bezierVertex(cx, cy, cx, cy, x2, y2);
+  bezierVertex(cx1, cy1, cx2, cy2, x2, y2);
   endShape();
 }
 
@@ -157,14 +168,20 @@ PVector getDroopedSpokePoint(PVector hub, float angle, float hubRadius, float ta
   float horizontalness = abs(cos(angle));
   float droopAmount = segLength * horizontalness * droopFactor;
 
-  float cx = (hubVertexX + perimeterX) / 2.0;
-  float cy = (hubVertexY + perimeterY) / 2.0 + droopAmount;
+  float midDroopX = (hubVertexX + perimeterX) / 2.0;
+  float midDroopY = (hubVertexY + perimeterY) / 2.0 + droopAmount;
+
+  // Calculate two control points matching the drawBezierCurve function
+  float cx1 = lerp(hubVertexX, midDroopX, curveSmoothness);
+  float cy1 = lerp(hubVertexY, midDroopY, curveSmoothness);
+  float cx2 = lerp(perimeterX, midDroopX, curveSmoothness);
+  float cy2 = lerp(perimeterY, midDroopY, curveSmoothness);
 
   float t = (targetRadius - hubRadius) / segLength;
   t = constrain(t, 0, 1);
 
-  float x = bezierPoint(hubVertexX, cx, cx, perimeterX, t);
-  float y = bezierPoint(hubVertexY, cy, cy, perimeterY, t);
+  float x = bezierPoint(hubVertexX, cx1, cx2, perimeterX, t);
+  float y = bezierPoint(hubVertexY, cy1, cy2, perimeterY, t);
 
   return new PVector(x, y);
 }
@@ -190,13 +207,13 @@ void keyPressed() {
     redraw();
   }
 
-  if (keyCode == UP) {
+  if (keyCode == DOWN) {
     droopFactor += 0.05;
     println("droopFactor: " + droopFactor);
     redraw();
   }
 
-  if (keyCode == DOWN) {
+  if (keyCode == UP) {
     droopFactor = max(0, droopFactor - 0.05);
     println("droopFactor: " + droopFactor);
     redraw();
