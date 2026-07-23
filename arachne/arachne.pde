@@ -6,12 +6,13 @@ import java.util.HashMap;
 // --- base config ---
 int width = 600;
 int height = 800;
-int webSpacing = 15;
 int numSpokes = 20;
+float decayFactor = 0.01; // Percent degradation of web. 0.0 = perfect web, 1.0 = totally empty web (don't)
 
 // --- keyPressed state ---
 float droopFactor = 0.35;
 boolean shouldRecord = false;
+int webSpacing = 15;
 
 // --- constants ---
 final float CURVE_SMOOTHNESS = 0.4;
@@ -142,10 +143,11 @@ void spinWeb() {
 }
 
 void drawPerimeter() {
-  stroke(255, 0, 0); // RED for debug
+  stroke(255, 0, 0); // RED for debugging sticks
   strokeWeight(3);
-  line(stick1Base.x, stick1Base.y, stick1Top.x, stick1Top.y);
-  line(stick2Base.x, stick2Base.y, stick2Top.x, stick2Top.y);
+  // Uncomment for debugging sticks
+  // line(stick1Base.x, stick1Base.y, stick1Top.x, stick1Top.y);
+  // line(stick2Base.x, stick2Base.y, stick2Top.x, stick2Top.y);
 
   // web frame strand
   stroke(0);
@@ -202,8 +204,9 @@ void drawSpiral(Spoke[] spokes) {
 
         if (connections.getOrDefault(key1, 0) < MAX_SPIRAL_CONNECTIONS &&
             connections.getOrDefault(key2, 0) < MAX_SPIRAL_CONNECTIONS) {
-
-          drawDroopedCurve(p1, p2, droopFactor);
+          if (random(0.0, 1.0) >= decayFactor) {
+            drawDroopedCurve(p1, p2, droopFactor);
+          }
 
           connections.put(key1, connections.getOrDefault(key1, 0) + 1);
           connections.put(key2, connections.getOrDefault(key2, 0) + 1);
