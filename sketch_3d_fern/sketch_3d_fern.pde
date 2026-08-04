@@ -2,22 +2,21 @@ import processing.svg.*;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 
-String fernFilename = "fern-6";
+String fernFilename = "simple-fern-3";
 
 PShape fernSVG;
 PShape[] bentFronds; // frond cache
-boolean shouldRecord = false;
 
-// bent frond
-float frondBendRadius = 700; // Needs to be larger than the svgHeight
-float angleDeg = random(50, 75);
+//consts
 float svgWidth; // needed for correct aspect ratio
 float svgHeight;
-// how much of the spiral to use
-float spiralAngleDeg = random(20, 150); // good values: 82 92
 float PHI = 1.61803398875f;
 
-// 3D Fern render
+// state
+boolean shouldRecord = false;
+float frondBendRadius = random(500, 700); // Needs to be larger than the svgHeight
+float angleDeg = random(50, 75);
+float spiralAngleDeg = random(120, 150); // how much of the spiral to use
 int frondNum = 11;
 float maxFernDistance = 500;
 
@@ -29,6 +28,7 @@ String generateFilename() {
 void setup() {
   size(800, 800, P3D);
   hint(ENABLE_DEPTH_SORT); // helper for rendering 3d to svg
+  pixelDensity(1);
   println("frondBendRadius: ", frondBendRadius);
   println("spiralAngleDeg: ", spiralAngleDeg);
 
@@ -55,7 +55,7 @@ void draw() {
   }
   background(255);
   // camera position with mouse control
-  translate(width / 2, (height - (height/3)), 0);
+  translate(width / 2, (height - (height/3)), -200);
   rotateX(map(mouseY, 0, height, -TWO_PI, TWO_PI));
   rotateY(map(mouseX, 0, width, -TWO_PI, TWO_PI));
   scale(0.4); // make fern smaller to fit on screen
@@ -96,34 +96,58 @@ void buildBentFrondCache(PShape source, PShape targetGroup) {
   } else {
     int vertexCount = source.getVertexCount();
     if (vertexCount > 0) {
-      // use pen plotting styles
+
       PShape pathSection = createShape();
       pathSection.beginShape();
       pathSection.noFill();
       pathSection.stroke(0);
       pathSection.strokeWeight(1);
 
+      PVector prevBent = null;
+      // Prevent random lines being added due to svg point ordering
+      // if a gap in the fernSVG is larger than this value, start a new shape.
+      // modify value HERE if necessary (svg missing chunks: reduce threshold, random lines: increase threshold)
+      float gapThreshold = 200.0f;
+
       for (int j = 0; j < vertexCount; j++) {
         PVector v = source.getVertex(j);
 
-        float flippedY = svgHeight - v.y; // flip upside down so ferns grow up
-        float normalizedY = flippedY / svgHeight; // y as percentage of height
+        float flippedY = svgHeight - v.y;
+        // guard: prevent math explosions if a vertex falls slightly outside the SVG bounds
+        float normalizedY = constrain(flippedY / svgHeight, 0.0, 1.0);
 
         float theta = normalizedY * radians(spiralAngleDeg);
         float centeredX = v.x - (svgWidth / 2);
         float xFlare = 0.10;
 
-        // Golden spiral radius.
-        // Radius changes by PHI every quarter turn.
-        // Negative exponent = inward curl toward the frond tip.
         float r = frondBendRadius * pow(PHI, -theta / HALF_PI);
         float bentX = centeredX * (1 + xFlare * normalizedY);
         float bentY = r * sin(theta);
         float bentZ = frondBendRadius - r * cos(theta);
 
-        pathSection.vertex(bentX, bentY, bentZ);
+        PVector currentBent = new PVector(bentX, bentY, bentZ);
 
+        // GAP DETECTION: If the distance from the last point is too large,
+        // fernSVG path jumped to a new sub-shape.
+        if (prevBent != null && PVector.dist(prevBent, currentBent) > gapThreshold) {
+
+          // Finish the current shape and add it to the group
+          pathSection.endShape();
+          targetGroup.addChild(pathSection);
+
+          // Start a brand new shape for this disconnected line
+          pathSection = createShape();
+          pathSection.beginShape();
+          pathSection.noFill();
+          pathSection.stroke(0);
+          pathSection.strokeWeight(1);
+        }
+
+        pathSection.vertex(bentX, bentY, bentZ);
+        prevBent = currentBent;
       }
+
+      // Add the final shape
       pathSection.endShape();
       targetGroup.addChild(pathSection);
     }
