@@ -14,9 +14,10 @@ float PHI = 1.61803398875f;
 
 // state
 boolean shouldRecord = false;
-float frondBendRadius = random(500, 700); // Needs to be larger than the svgHeight
-float angleDeg = random(50, 75);
-float spiralAngleDeg = random(120, 150); // how much of the spiral to use
+boolean needsRebuild = true; // flag to rebuild cache
+
+float frondBendRadius;
+float spiralAngleDeg;
 int frondNum = 11;
 float maxFernDistance = 500;
 
@@ -25,12 +26,32 @@ String generateFilename() {
   return "fern-3d-" + timestamp + ".svg";
 }
 
+void randomizeState() {
+  frondBendRadius = random(500, 700);
+  spiralAngleDeg = random(120, 150);
+  frondNum = 11;
+  maxFernDistance = 500;
+}
+
+void rebuildFrondCache() {
+  // frondBendRadius must be at least svg height to not warp the shape
+  frondBendRadius = max(svgHeight, frondBendRadius);
+
+  bentFronds = new PShape[frondNum];
+  for (int i = 0; i < frondNum; i++) {
+    bentFronds[i] = createShape(GROUP);
+    buildBentFrondCache(fernSVG, bentFronds[i]);
+  }
+  println("Rebuilt Cache -> BendRadius: " + nf(frondBendRadius,0,1) +
+          " | Spiral: " + nf(spiralAngleDeg,0,1) +
+          " | Fronds: " + frondNum +
+          " | Distance: " + nf(maxFernDistance,0,1));
+}
+
 void setup() {
   size(800, 800, P3D);
   hint(ENABLE_DEPTH_SORT); // helper for rendering 3d to svg
   pixelDensity(1);
-  println("frondBendRadius: ", frondBendRadius);
-  println("spiralAngleDeg: ", spiralAngleDeg);
 
   fernSVG = loadShape(fernFilename + ".svg"); // lives in "./data"
   if (fernSVG == null) {
@@ -41,19 +62,22 @@ void setup() {
   svgWidth = fernSVG.width;
   svgHeight = fernSVG.height;
 
-  // bent fern cache
-  bentFronds = new PShape[frondNum];
-  for (int i = 0; i < frondNum; i++) {
-    bentFronds[i] = createShape(GROUP);
-    buildBentFrondCache(fernSVG, bentFronds[i]);
-  }
+  // Initialize state and build cache for the first time
+  randomizeState();
+  rebuildFrondCache();
 }
 
 void draw() {
+  if (needsRebuild) {
+    rebuildFrondCache();
+    needsRebuild = false;
+  }
+
   if (shouldRecord) {
     beginRaw(SVG, generateFilename());
   }
   background(255);
+
   // camera position with mouse control
   translate(width / 2, (height - (height/3)), -200);
   rotateX(map(mouseY, 0, height, -TWO_PI, TWO_PI));
@@ -72,7 +96,6 @@ void draw() {
 
     float ringAngle = map(i, 0, frondNum, 0, TWO_PI);
     rotateY(ringAngle);
-    // rotateZ(HALF_PI);
     translate(0, 0, random(maxFernDistance));
     shape(bentFronds[i]);
 
@@ -84,6 +107,49 @@ void draw() {
     shouldRecord = false;
     println("yay SVG exported!");
   }
+
+  drawHUD();
+}
+
+void drawHUD() {
+  // 2D HUD for key command hints
+  // Save 3D drawing styles and 3D matrix transformations for later
+  pushStyle();
+  pushMatrix();
+
+  // turn off depth testing so text draws on top of everything
+  hint(DISABLE_DEPTH_TEST);
+  // switch to a flat 2D camera
+  ortho(-width/2, width/2, -height/2, height/2, -1000, 1000);
+  // clear out the 3D scene's rotateX, rotateY, and scale(0.4)
+  resetMatrix();
+  // move the origin (0,0) to the top-left corner
+  translate(-width/2, -height/2, 0);
+
+  noStroke();
+  fill(0, 0, 0, 200); // Semi-transparent black background
+  rect(10, 10, 270, 155, 5);
+
+  fill(255);
+  textSize(14);
+  textLeading(18);
+  textAlign(LEFT, TOP);
+
+  String hudText = "--- FERN CONTROLS ---\n";
+  hudText += "[Q / A] Bend Radius: " + nf(frondBendRadius, 0, 1) + "\n";
+  hudText += "[W / S] Spiral Angle: " + nf(spiralAngleDeg, 0, 1) + " deg\n";
+  hudText += "[E / D] Frond Count:  " + frondNum + "\n";
+  hudText += "[T / G] Max Distance: " + nf(maxFernDistance, 0, 1) + "\n";
+  hudText += "[SPACE] Randomize All\n";
+  hudText += "[R] Record SVG";
+
+  text(hudText, 20, 15);
+
+  // switch back to 3D perspective
+  perspective();
+  hint(ENABLE_DEPTH_TEST);
+  popMatrix();
+  popStyle();
 }
 
 void buildBentFrondCache(PShape source, PShape targetGroup) {
@@ -155,7 +221,51 @@ void buildBentFrondCache(PShape source, PShape targetGroup) {
 }
 
 void keyPressed() {
+  boolean changed = false;
+
+  // [R] Record
   if (key == 'r' || key == 'R') {
     shouldRecord = true;
+  }
+  // [SPACE] Randomize
+  else if (key == ' ') {
+    randomizeState();
+    changed = true;
+  }
+  // [Q / A] Adjust frondBendRadius
+  else if (key == 'q' || key == 'Q') {
+    frondBendRadius += 20;
+    changed = true;
+  } else if (key == 'a' || key == 'A') {
+    frondBendRadius -= 20;
+    changed = true;
+  }
+  // [W / S] Adjust spiralAngleDeg
+  else if (key == 'w' || key == 'W') {
+    spiralAngleDeg += 5;
+    changed = true;
+  } else if (key == 's' || key == 'S') {
+    spiralAngleDeg -= 5;
+    changed = true;
+  }
+  // [E / D] Adjust frondNum
+  else if (key == 'e' || key == 'E') {
+    frondNum++;
+    changed = true;
+  } else if (key == 'd' || key == 'D') {
+    frondNum = max(1, frondNum - 1); // prevent going below 1
+    changed = true;
+  }
+  // [T / G] Adjust maxFernDistance
+  else if (key == 't' || key == 'T') {
+    maxFernDistance += 20;
+    changed = true;
+  } else if (key == 'g' || key == 'G') {
+    maxFernDistance -= 20;
+    changed = true;
+  }
+
+  if (changed) {
+    needsRebuild = true;
   }
 }
