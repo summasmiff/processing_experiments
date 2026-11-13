@@ -23,7 +23,10 @@ Press **S** to export the current line as an SVG, or **R** to start a new line.
 </p>
 
 ### Drift
-Move the mouse to rotate the view. Press **R** to export an SVG, **+/-** to change noise octaves, and **[/]** to decrease/increase the height displacement.
+- Move the mouse to rotate the view.
+- Press **R** to export an SVG.
+- **+/-** to change noise octaves.
+- **[/]** to decrease/increase the height displacement.
 
 <p align="center">
   <img src="output/drift_gamboge_coral_4.jpg" width="450" alt="Drift artwork with a fragmented noise-driven grid">
@@ -37,15 +40,16 @@ Press **R** to export an SVG, **Up/Down** to adjust droop, and **[/]** to decrea
 </p>
 
 ### 3D fern
-Move the mouse to rotate the view. Press **F** to cycle fern source files, **R** to export an SVG, and **P** to save a preview PNG. **Space** randomizes parameters; **Q/A** adjusts bend radius, **W/S** spiral angle, **E/D** frond count, **T/G** distance, and **Left/Right** ring angle.
+- Move the mouse to rotate the view.
+- Press **F** to cycle fern source files.
+- **R** to export an SVG, and **P** to save a preview PNG.
+- **Space** randomizes parameters
+- **Q/A** adjusts bend radius
+- **W/S** spiral angle
+- **E/D** frond count
+- **T/G** distance
+- **Left/Right** ring angle
 
 <p align="center">
   <img src="sketch_3d_fern/preview.png" width="450" alt="3D fern sketch preview">
-</p>
-
-### 3D sphere
-This sketch has no keyboard shortcuts.
-
-<p align="center">
-  <img src="sketch_3d_sphere/preview.png" width="450" alt="3D sphere sketch preview">
 </p>
